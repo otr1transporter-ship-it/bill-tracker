@@ -75,6 +75,35 @@
             color: #1e3c72;
         }
         
+        .notes-section {
+            padding: 20px;
+            background: #fff3cd;
+            border-bottom: 2px solid #ffc107;
+        }
+        
+        .notes-section h3 {
+            font-size: 1em;
+            color: #856404;
+            margin-bottom: 10px;
+        }
+        
+        .notes-input {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #ffc107;
+            border-radius: 6px;
+            font-size: 1em;
+            resize: vertical;
+            min-height: 60px;
+        }
+        
+        .notes-counter {
+            font-size: 0.85em;
+            color: #856404;
+            margin-top: 5px;
+            text-align: right;
+        }
+        
         .controls {
             padding: 20px;
             background: white;
@@ -173,6 +202,11 @@
             background: #f8f9fa;
         }
         
+        .bill-item.paid {
+            background: #d4edda;
+            border-color: #28a745;
+        }
+        
         .bill-header {
             display: flex;
             justify-content: space-between;
@@ -210,24 +244,35 @@
             border-radius: 5px;
             overflow: hidden;
             margin-bottom: 10px;
+            display: flex;
         }
         
-        .progress-fill {
-            height: 100%;
+        .progress-elapsed {
+            background: #6c757d;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            font-size: 0.75em;
+        }
+        
+        .progress-remaining {
             display: flex;
             align-items: center;
             justify-content: center;
             color: white;
             font-weight: bold;
             font-size: 0.85em;
-            transition: width 0.3s;
         }
         
         .progress-green { background: #28a745; }
-        .progress-lime { background: #82c91e; }
-        .progress-yellow { background: #ffc107; color: #333; }
-        .progress-orange { background: #fd7e14; }
         .progress-red { background: #dc3545; }
+        .progress-full-green { 
+            background: #28a745; 
+            width: 100%;
+            justify-content: center;
+        }
         
         .bill-actions {
             display: flex;
@@ -253,6 +298,15 @@
             background: #138496;
         }
         
+        .btn-paid {
+            background: #28a745;
+            color: white;
+        }
+        
+        .btn-paid:hover {
+            background: #218838;
+        }
+        
         .btn-toggle {
             background: #6c757d;
             color: white;
@@ -271,6 +325,54 @@
             background: #c82333;
         }
         
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+            overflow-y: auto;
+        }
+        
+        .modal.show {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .modal-content {
+            background-color: white;
+            margin: 20px;
+            padding: 30px;
+            border-radius: 10px;
+            max-width: 600px;
+            width: 100%;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+        
+        .modal-header {
+            font-size: 1.5em;
+            font-weight: bold;
+            margin-bottom: 20px;
+            color: #1e3c72;
+        }
+        
+        .close {
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+            color: #aaa;
+            cursor: pointer;
+        }
+        
+        .close:hover {
+            color: #000;
+        }
+        
         @media (max-width: 600px) {
             .header h1 {
                 font-size: 1.5em;
@@ -283,6 +385,11 @@
             .bill-amount {
                 margin-left: 0;
                 margin-top: 5px;
+            }
+            
+            .modal-content {
+                margin: 10px;
+                padding: 20px;
             }
         }
     </style>
@@ -313,6 +420,12 @@
             </div>
         </div>
         
+        <div class="notes-section">
+            <h3>📝 Quick Notes (Max 10 words)</h3>
+            <textarea class="notes-input" id="notesInput" placeholder="Add quick notes here..."></textarea>
+            <div class="notes-counter" id="notesCounter">0 / 10 words</div>
+        </div>
+        
         <div class="controls">
             <button class="btn btn-success" onclick="toggleForm()">+ Add New Bill</button>
         </div>
@@ -329,24 +442,8 @@
                     <input type="number" id="newAmount" placeholder="0.00" step="0.01">
                 </div>
                 <div class="form-group">
-                    <label>Current Balance</label>
-                    <input type="number" id="newBalance" placeholder="0.00" step="0.01">
-                </div>
-                <div class="form-group">
                     <label>Due Date*</label>
                     <input type="date" id="newDueDate">
-                </div>
-                <div class="form-group">
-                    <label>Interest Rate (%)</label>
-                    <input type="number" id="newRate" placeholder="0.00" step="0.01">
-                </div>
-                <div class="form-group">
-                    <label>Rate Adjust Date</label>
-                    <input type="date" id="newRateDate">
-                </div>
-                <div class="form-group">
-                    <label>Annual Fee</label>
-                    <input type="number" id="newFee" placeholder="0.00" step="0.01">
                 </div>
             </div>
             <button class="btn btn-success" onclick="addBill()">Add Bill</button>
@@ -356,6 +453,52 @@
         <div class="bills-container">
             <h2 style="margin-bottom: 15px;">Your Bills</h2>
             <div id="billsList"></div>
+        </div>
+    </div>
+
+    <!-- Edit Modal -->
+    <div id="editModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeEditModal()">&times;</span>
+            <div class="modal-header">Edit Bill Details</div>
+            <div class="form-grid">
+                <div class="form-group">
+                    <label>Bill Name</label>
+                    <input type="text" id="editName">
+                </div>
+                <div class="form-group">
+                    <label>Monthly Payment</label>
+                    <input type="number" id="editAmount" step="0.01">
+                </div>
+                <div class="form-group">
+                    <label>Current Balance</label>
+                    <input type="number" id="editBalance" step="0.01" placeholder="Optional">
+                </div>
+                <div class="form-group">
+                    <label>Due Date</label>
+                    <input type="date" id="editDueDate">
+                </div>
+                <div class="form-group">
+                    <label>Interest Rate (%)</label>
+                    <input type="number" id="editRate" step="0.01" placeholder="Optional">
+                </div>
+                <div class="form-group">
+                    <label>Interest Rate Expires</label>
+                    <input type="date" id="editRateExpiry" placeholder="Optional">
+                </div>
+                <div class="form-group">
+                    <label>Annual Fee</label>
+                    <input type="number" id="editAnnualFee" step="0.01" placeholder="Optional">
+                </div>
+                <div class="form-group">
+                    <label>Monthly Fee</label>
+                    <input type="number" id="editMonthlyFee" step="0.01" placeholder="Optional">
+                </div>
+            </div>
+            <div style="margin-top: 20px; display: flex; gap: 10px;">
+                <button class="btn btn-success" onclick="saveEdit()">Save Changes</button>
+                <button class="btn" onclick="closeEditModal()">Cancel</button>
+            </div>
         </div>
     </div>
 
@@ -376,16 +519,45 @@
         const app = initializeApp(firebaseConfig);
         const database = getDatabase(app);
         const billsRef = ref(database, 'billsDetailed');
+        const notesRef = ref(database, 'notes');
 
         let bills = [];
-        let editingId = null;
+        let editingBillId = null;
+
+        // Load notes
+        onValue(notesRef, (snapshot) => {
+            const notes = snapshot.val();
+            if (notes) {
+                document.getElementById('notesInput').value = notes;
+                updateNotesCounter();
+            }
+        });
+
+        // Notes word counter
+        document.getElementById('notesInput').addEventListener('input', function() {
+            updateNotesCounter();
+            const words = this.value.trim().split(/\s+/).filter(w => w.length > 0);
+            if (words.length > 10) {
+                const limited = words.slice(0, 10).join(' ');
+                this.value = limited;
+                updateNotesCounter();
+            }
+            // Auto-save notes
+            set(notesRef, this.value);
+        });
+
+        function updateNotesCounter() {
+            const text = document.getElementById('notesInput').value.trim();
+            const words = text.split(/\s+/).filter(w => w.length > 0);
+            const count = text.length === 0 ? 0 : words.length;
+            document.getElementById('notesCounter').textContent = `${count} / 10 words`;
+        }
 
         onValue(billsRef, (snapshot) => {
             const data = snapshot.val();
             if (data) {
                 bills = Object.entries(data).map(([id, bill]) => ({ id, ...bill }));
             } else {
-                // Initialize with default bills if empty
                 initializeDefaultBills();
             }
             render();
@@ -394,28 +566,28 @@
 
         function initializeDefaultBills() {
             const defaultBills = [
-                { name: 'Community West CU - Mortgage', amount: 800.00, dueDate: '2025-11-04', active: true },
-                { name: 'Travelers Insurance', amount: 140.08, dueDate: '2025-11-07', active: true },
-                { name: 'Auto-Owners Insurance', amount: 102.81, dueDate: '2025-11-06', active: true },
-                { name: 'Consumers Energy', amount: 90.00, dueDate: '2025-11-04', active: true },
-                { name: 'DTE Energy', amount: 20.00, dueDate: '2025-11-20', active: true },
-                { name: 'Verizon Wireless', amount: 85.00, dueDate: '2025-11-10', active: true },
-                { name: 'Comcast', amount: 43.00, dueDate: '2025-11-15', active: true },
-                { name: 'Barclaycard US', amount: 50.00, dueDate: '2025-11-01', active: true },
-                { name: 'Amex Payment', amount: 40.00, balance: 1340.27, dueDate: '2025-11-15', active: true },
-                { name: 'Chase Freedom', amount: 85.00, balance: 4257.00, dueDate: '2025-11-10', active: true },
-                { name: 'AliveCor', amount: 11.99, dueDate: '2025-11-12', active: true },
-                { name: 'Writers Welcome', amount: 149.00, dueDate: '2025-11-01', active: true },
-                { name: 'Amazon Prime', amount: 15.89, dueDate: '2025-11-05', active: true },
-                { name: 'Prime Video', amount: 12.99, dueDate: '2025-11-08', active: true },
-                { name: 'OpenAI', amount: 20.00, dueDate: '2025-11-12', active: true },
-                { name: 'Claude.AI', amount: 20.00, dueDate: '2025-11-14', active: true },
-                { name: 'NY Times Digital', amount: 4.00, dueDate: '2025-11-18', active: true },
-                { name: 'Google Pandora', amount: 10.99, dueDate: '2025-11-15', active: true },
-                { name: 'Microsoft 365', amount: 10.59, dueDate: '2025-11-10', active: true },
-                { name: 'BeenVerified', amount: 29.99, dueDate: '2025-11-20', active: true },
-                { name: 'Google YouTube Premium', amount: 13.99, dueDate: '2025-11-10', active: true },
-                { name: 'Truck Loan - PAID OFF', amount: 1500.00, dueDate: '2025-09-04', active: false }
+                { name: 'Community West CU - Mortgage', amount: 800.00, dueDate: '2025-11-04', active: true, paid: false },
+                { name: 'Travelers Insurance', amount: 140.08, dueDate: '2025-11-07', active: true, paid: false },
+                { name: 'Auto-Owners Insurance', amount: 102.81, dueDate: '2025-11-06', active: true, paid: false },
+                { name: 'Consumers Energy', amount: 90.00, dueDate: '2025-11-04', active: true, paid: false },
+                { name: 'DTE Energy', amount: 20.00, dueDate: '2025-11-20', active: true, paid: false },
+                { name: 'Verizon Wireless', amount: 85.00, dueDate: '2025-11-10', active: true, paid: false },
+                { name: 'Comcast', amount: 43.00, dueDate: '2025-11-15', active: true, paid: false },
+                { name: 'Barclaycard US', amount: 50.00, dueDate: '2025-11-01', active: true, paid: false },
+                { name: 'Amex Payment', amount: 40.00, balance: 1340.27, dueDate: '2025-11-15', active: true, paid: false },
+                { name: 'Chase Freedom', amount: 85.00, balance: 4257.00, dueDate: '2025-11-10', active: true, paid: false },
+                { name: 'AliveCor', amount: 11.99, dueDate: '2025-11-12', active: true, paid: false },
+                { name: 'Writers Welcome', amount: 149.00, dueDate: '2025-11-01', active: true, paid: false },
+                { name: 'Amazon Prime', amount: 15.89, dueDate: '2025-11-05', active: true, paid: false },
+                { name: 'Prime Video', amount: 12.99, dueDate: '2025-11-08', active: true, paid: false },
+                { name: 'OpenAI', amount: 20.00, dueDate: '2025-11-12', active: true, paid: false },
+                { name: 'Claude.AI', amount: 20.00, dueDate: '2025-11-14', active: true, paid: false },
+                { name: 'NY Times Digital', amount: 4.00, dueDate: '2025-11-18', active: true, paid: false },
+                { name: 'Google Pandora', amount: 10.99, dueDate: '2025-11-15', active: true, paid: false },
+                { name: 'Microsoft 365', amount: 10.59, dueDate: '2025-11-10', active: true, paid: false },
+                { name: 'BeenVerified', amount: 29.99, dueDate: '2025-11-20', active: true, paid: false },
+                { name: 'Google YouTube Premium', amount: 13.99, dueDate: '2025-11-10', active: true, paid: false },
+                { name: 'Truck Loan - PAID OFF', amount: 1500.00, dueDate: '2025-09-04', active: false, paid: false }
             ];
 
             defaultBills.forEach((bill, index) => {
@@ -440,11 +612,7 @@
         window.addBill = function() {
             const name = document.getElementById('newName').value.trim();
             const amount = parseFloat(document.getElementById('newAmount').value) || 0;
-            const balance = parseFloat(document.getElementById('newBalance').value) || null;
             const dueDate = document.getElementById('newDueDate').value;
-            const rate = parseFloat(document.getElementById('newRate').value) || null;
-            const rateDate = document.getElementById('newRateDate').value || null;
-            const fee = parseFloat(document.getElementById('newFee').value) || null;
 
             if (!name || !dueDate) {
                 alert('Please enter bill name and due date');
@@ -455,25 +623,77 @@
             const bill = {
                 name,
                 amount,
-                balance,
                 dueDate,
                 active: true,
-                interestRate: rate,
-                interestAdjustDate: rateDate,
-                annualFee: fee
+                paid: false
             };
 
             updateSyncStatus(false);
             set(ref(database, `billsDetailed/${billId}`), bill).then(() => {
                 document.getElementById('newName').value = '';
                 document.getElementById('newAmount').value = '';
-                document.getElementById('newBalance').value = '';
                 document.getElementById('newDueDate').value = '';
-                document.getElementById('newRate').value = '';
-                document.getElementById('newRateDate').value = '';
-                document.getElementById('newFee').value = '';
                 toggleForm();
             });
+        };
+
+        window.openEditModal = function(billId) {
+            const bill = bills.find(b => b.id === billId);
+            if (!bill) return;
+
+            editingBillId = billId;
+            document.getElementById('editName').value = bill.name || '';
+            document.getElementById('editAmount').value = bill.amount || '';
+            document.getElementById('editBalance').value = bill.balance || '';
+            document.getElementById('editDueDate').value = bill.dueDate || '';
+            document.getElementById('editRate').value = bill.interestRate || '';
+            document.getElementById('editRateExpiry').value = bill.interestRateExpiry || '';
+            document.getElementById('editAnnualFee').value = bill.annualFee || '';
+            document.getElementById('editMonthlyFee').value = bill.monthlyFee || '';
+
+            document.getElementById('editModal').classList.add('show');
+        };
+
+        window.closeEditModal = function() {
+            document.getElementById('editModal').classList.remove('show');
+            editingBillId = null;
+        };
+
+        window.saveEdit = function() {
+            if (!editingBillId) return;
+
+            const updatedBill = {
+                name: document.getElementById('editName').value.trim(),
+                amount: parseFloat(document.getElementById('editAmount').value) || 0,
+                balance: parseFloat(document.getElementById('editBalance').value) || null,
+                dueDate: document.getElementById('editDueDate').value,
+                interestRate: parseFloat(document.getElementById('editRate').value) || null,
+                interestRateExpiry: document.getElementById('editRateExpiry').value || null,
+                annualFee: parseFloat(document.getElementById('editAnnualFee').value) || null,
+                monthlyFee: parseFloat(document.getElementById('editMonthlyFee').value) || null
+            };
+
+            // Keep existing fields
+            const existingBill = bills.find(b => b.id === editingBillId);
+            if (existingBill) {
+                updatedBill.active = existingBill.active;
+                updatedBill.paid = existingBill.paid;
+            }
+
+            updateSyncStatus(false);
+            update(ref(database, `billsDetailed/${editingBillId}`), updatedBill).then(() => {
+                closeEditModal();
+            });
+        };
+
+        window.togglePaid = function(billId) {
+            const bill = bills.find(b => b.id === billId);
+            if (bill) {
+                updateSyncStatus(false);
+                update(ref(database, `billsDetailed/${billId}`), {
+                    paid: !bill.paid
+                });
+            }
         };
 
         window.toggleActive = function(billId) {
@@ -493,28 +713,6 @@
             }
         };
 
-        window.editBill = function(billId) {
-            const bill = bills.find(b => b.id === billId);
-            if (!bill) return;
-
-            const newName = prompt('Bill Name:', bill.name);
-            if (!newName) return;
-
-            const newAmount = parseFloat(prompt('Monthly Payment:', bill.amount));
-            const newBalance = prompt('Current Balance:', bill.balance || '');
-            const newRate = prompt('Interest Rate (%):', bill.interestRate || '');
-            const newFee = prompt('Annual Fee:', bill.annualFee || '');
-
-            updateSyncStatus(false);
-            update(ref(database, `billsDetailed/${billId}`), {
-                name: newName,
-                amount: newAmount || bill.amount,
-                balance: newBalance ? parseFloat(newBalance) : null,
-                interestRate: newRate ? parseFloat(newRate) : null,
-                annualFee: newFee ? parseFloat(newFee) : null
-            });
-        };
-
         function getDaysUntil(dateStr) {
             const today = new Date();
             today.setHours(0, 0, 0, 0);
@@ -523,30 +721,16 @@
             return Math.ceil((due - today) / (1000 * 60 * 60 * 24));
         }
 
-        function getProgressColor(days) {
-            if (days < 0) return 'red';
-            if (days <= 3) return 'orange';
-            if (days <= 7) return 'yellow';
-            if (days <= 14) return 'lime';
-            return 'green';
-        }
-
-        function getProgressWidth(days) {
-            if (days < 0) return 5;
-            const width = (days / 30) * 100;
-            return Math.min(Math.max(width, 5), 100);
-        }
-
         function render() {
             const activeBills = bills.filter(b => b.active);
             const totalPayments = activeBills.reduce((sum, b) => sum + b.amount, 0);
             const totalDebt = activeBills.reduce((sum, b) => sum + (b.balance || 0), 0);
-            const totalFees = activeBills.reduce((sum, b) => sum + (b.annualFee || 0), 0);
+            const totalAnnualFees = activeBills.reduce((sum, b) => sum + (b.annualFee || 0), 0);
 
             document.getElementById('activeBills').textContent = activeBills.length;
             document.getElementById('monthlyPayments').textContent = '$' + totalPayments.toFixed(2);
             document.getElementById('totalDebt').textContent = '$' + totalDebt.toFixed(2);
-            document.getElementById('annualFees').textContent = '$' + totalFees.toFixed(2);
+            document.getElementById('annualFees').textContent = '$' + totalAnnualFees.toFixed(2);
 
             const sortedBills = [...bills].sort((a, b) => {
                 if (a.active !== b.active) return b.active - a.active;
@@ -554,41 +738,97 @@
             });
 
             const html = sortedBills.map(bill => {
-                const days = getDaysUntil(bill.dueDate);
-                const color = getProgressColor(days);
-                const width = getProgressWidth(days);
+                const daysRemaining = getDaysUntil(bill.dueDate);
                 const dueDate = new Date(bill.dueDate);
+                const isPaid = bill.paid;
+                
+                // Assume 30-day billing cycle
+                const cycleLength = 30;
+                const daysElapsed = cycleLength - daysRemaining;
+                const elapsedPercent = Math.max(0, (daysElapsed / cycleLength) * 100);
+                const remainingPercent = Math.max(0, (daysRemaining / cycleLength) * 100);
 
-                let details = `<div class="bill-detail-row">Due: ${dueDate.toLocaleDateString()} (${days < 0 ? 'OVERDUE by ' + Math.abs(days) : days} days)</div>`;
+                let statusText = '';
+                let progressBarHtml = '';
+
+                if (isPaid) {
+                    statusText = '✅ PAID';
+                    progressBarHtml = `
+                        <div class="progress-bar">
+                            <div class="progress-full-green">✅ PAID - Bill Cycle Complete</div>
+                        </div>
+                    `;
+                } else {
+                    const remainingColor = daysRemaining <= 3 ? 'red' : 'green';
+                    
+                    if (daysRemaining < 0) {
+                        statusText = `⚠️ OVERDUE by ${Math.abs(daysRemaining)} days`;
+                    } else if (daysRemaining <= 3) {
+                        statusText = `🔴 DUE IN ${daysRemaining} DAYS`;
+                    } else {
+                        statusText = `${daysRemaining} days remaining`;
+                    }
+
+                    if (daysRemaining < 0) {
+                        // Overdue - show all gray
+                        progressBarHtml = `
+                            <div class="progress-bar">
+                                <div class="progress-elapsed" style="width: 100%">
+                                    OVERDUE by ${Math.abs(daysRemaining)} days
+                                </div>
+                            </div>
+                        `;
+                    } else {
+                        // Normal - show gray (elapsed) and green/red (remaining)
+                        progressBarHtml = `
+                            <div class="progress-bar">
+                                <div class="progress-elapsed" style="width: ${elapsedPercent}%">
+                                    ${daysElapsed > 0 ? daysElapsed + 'd elapsed' : ''}
+                                </div>
+                                <div class="progress-remaining progress-${remainingColor}" style="width: ${remainingPercent}%">
+                                    ${daysRemaining} days left
+                                </div>
+                            </div>
+                        `;
+                    }
+                }
+
+                let details = `<div class="bill-detail-row">Due: ${dueDate.toLocaleDateString()} - ${statusText}</div>`;
                 
                 if (bill.balance) {
                     details += `<div class="bill-detail-row">Balance: $${bill.balance.toFixed(2)}</div>`;
                 }
                 if (bill.interestRate) {
                     details += `<div class="bill-detail-row">Interest Rate: ${bill.interestRate}%`;
-                    if (bill.interestAdjustDate) {
-                        details += ` (adjusts ${new Date(bill.interestAdjustDate).toLocaleDateString()})`;
+                    if (bill.interestRateExpiry) {
+                        details += ` (expires ${new Date(bill.interestRateExpiry).toLocaleDateString()})`;
                     }
                     details += `</div>`;
                 }
                 if (bill.annualFee) {
                     details += `<div class="bill-detail-row">Annual Fee: $${bill.annualFee.toFixed(2)}</div>`;
                 }
+                if (bill.monthlyFee) {
+                    details += `<div class="bill-detail-row">Monthly Fee: $${bill.monthlyFee.toFixed(2)}</div>`;
+                }
+
+                const itemClasses = ['bill-item'];
+                if (!bill.active) itemClasses.push('inactive');
+                if (isPaid) itemClasses.push('paid');
 
                 return `
-                    <div class="bill-item ${bill.active ? '' : 'inactive'}">
+                    <div class="${itemClasses.join(' ')}">
                         <div class="bill-header">
                             <div class="bill-name">${bill.name}</div>
                             <div class="bill-amount">$${bill.amount.toFixed(2)}</div>
                         </div>
                         <div class="bill-details">${details}</div>
-                        <div class="progress-bar">
-                            <div class="progress-fill progress-${color}" style="width: ${width}%">
-                                ${days < 0 ? 'OVERDUE' : days + ' days'}
-                            </div>
-                        </div>
+                        ${progressBarHtml}
                         <div class="bill-actions">
-                            <button class="btn-small btn-edit" onclick="editBill('${bill.id}')">Edit</button>
+                            <button class="btn-small btn-edit" onclick="openEditModal('${bill.id}')">Edit Details</button>
+                            <button class="btn-small btn-paid" onclick="togglePaid('${bill.id}')">
+                                ${isPaid ? 'Mark Unpaid' : 'Mark Paid'}
+                            </button>
                             <button class="btn-small btn-toggle" onclick="toggleActive('${bill.id}')">
                                 ${bill.active ? 'Deactivate' : 'Activate'}
                             </button>
