@@ -18,6 +18,85 @@
             padding: 20px;
         }
         
+        .login-screen {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            z-index: 9999;
+        }
+        
+        .login-screen.hidden {
+            display: none;
+        }
+        
+        .login-box {
+            background: white;
+            padding: 40px;
+            border-radius: 15px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+            text-align: center;
+            max-width: 400px;
+            width: 90%;
+        }
+        
+        .login-box h1 {
+            color: #1e3c72;
+            margin-bottom: 10px;
+        }
+        
+        .login-box p {
+            color: #666;
+            margin-bottom: 30px;
+        }
+        
+        .login-box input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 1em;
+            margin-bottom: 15px;
+        }
+        
+        .login-box input:focus {
+            outline: none;
+            border-color: #1e3c72;
+        }
+        
+        .login-box button {
+            width: 100%;
+            background: #1e3c72;
+            color: white;
+            border: none;
+            padding: 12px;
+            border-radius: 8px;
+            font-size: 1em;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        
+        .login-box button:hover {
+            background: #2a5298;
+        }
+        
+        .error-message {
+            color: #dc3545;
+            margin-top: 10px;
+            font-size: 0.9em;
+            display: none;
+        }
+        
+        .error-message.show {
+            display: block;
+        }
+        
         .container {
             max-width: 1000px;
             margin: 0 auto;
@@ -25,12 +104,18 @@
             border-radius: 15px;
             box-shadow: 0 10px 40px rgba(0,0,0,0.3);
             overflow: hidden;
+            display: none;
+        }
+        
+        .container.show {
+            display: block;
         }
         
         .header {
             background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
             color: white;
             padding: 25px;
+            position: relative;
         }
         
         .header h1 {
@@ -42,6 +127,23 @@
             font-size: 0.85em;
             opacity: 0.9;
             margin-top: 5px;
+        }
+        
+        .logout-btn {
+            position: absolute;
+            top: 25px;
+            right: 25px;
+            background: rgba(255,255,255,0.2);
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 0.85em;
+        }
+        
+        .logout-btn:hover {
+            background: rgba(255,255,255,0.3);
         }
         
         .summary {
@@ -373,6 +475,13 @@
                 font-size: 1.5em;
             }
             
+            .logout-btn {
+                position: static;
+                margin-top: 10px;
+                display: block;
+                width: 100%;
+            }
+            
             .bill-header {
                 flex-direction: column;
             }
@@ -390,8 +499,21 @@
     </style>
 </head>
 <body>
-    <div class="container">
+    <!-- Login Screen -->
+    <div class="login-screen" id="loginScreen">
+        <div class="login-box">
+            <h1>🔒 Bill Tracker</h1>
+            <p>Please enter password to access</p>
+            <input type="password" id="passwordInput" placeholder="Enter password" autocomplete="off">
+            <button onclick="checkPassword()">Access Tracker</button>
+            <div class="error-message" id="errorMessage">Incorrect password. Please try again.</div>
+        </div>
+    </div>
+
+    <!-- Main Tracker (hidden until password correct) -->
+    <div class="container" id="mainContainer">
         <div class="header">
+            <button class="logout-btn" onclick="logout()">🔓 Logout</button>
             <h1>💰 Bill Payment Tracker</h1>
             <div class="sync-status" id="syncStatus">🔄 Connecting...</div>
         </div>
@@ -497,6 +619,48 @@
     </div>
 
     <script type="module">
+        // Password protection
+        const CORRECT_PASSWORD = "Raineer";
+        
+        // Check if already logged in (session storage)
+        if (sessionStorage.getItem('billTrackerAuth') === 'true') {
+            showMainApp();
+        }
+        
+        window.checkPassword = function() {
+            const input = document.getElementById('passwordInput');
+            const errorMsg = document.getElementById('errorMessage');
+            
+            if (input.value === CORRECT_PASSWORD) {
+                sessionStorage.setItem('billTrackerAuth', 'true');
+                showMainApp();
+            } else {
+                errorMsg.classList.add('show');
+                input.value = '';
+                input.focus();
+            }
+        };
+        
+        window.logout = function() {
+            sessionStorage.removeItem('billTrackerAuth');
+            document.getElementById('loginScreen').classList.remove('hidden');
+            document.getElementById('mainContainer').classList.remove('show');
+            document.getElementById('passwordInput').value = '';
+        };
+        
+        function showMainApp() {
+            document.getElementById('loginScreen').classList.add('hidden');
+            document.getElementById('mainContainer').classList.add('show');
+        }
+        
+        // Allow Enter key to submit password
+        document.getElementById('passwordInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                checkPassword();
+            }
+        });
+
+        // Firebase and main app code
         import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
         import { getDatabase, ref, set, onValue, remove, update } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js';
 
@@ -530,28 +694,28 @@
 
         function initializeDefaultBills() {
             const defaultBills = [
-                { name: 'Community West CU - Mortgage', amount: 800.00, dueDate: '2025-11-04', active: true, paid: false },
-                { name: 'Travelers Insurance', amount: 140.08, dueDate: '2025-11-07', active: true, paid: false },
-                { name: 'Auto-Owners Insurance', amount: 102.81, dueDate: '2025-11-06', active: true, paid: false },
-                { name: 'Consumers Energy', amount: 90.00, dueDate: '2025-11-04', active: true, paid: false },
-                { name: 'DTE Energy', amount: 20.00, dueDate: '2025-11-20', active: true, paid: false },
-                { name: 'Verizon Wireless', amount: 85.00, dueDate: '2025-11-10', active: true, paid: false },
-                { name: 'Comcast', amount: 43.00, dueDate: '2025-11-15', active: true, paid: false },
-                { name: 'Barclaycard US', amount: 50.00, dueDate: '2025-11-01', active: true, paid: false },
-                { name: 'Amex Payment', amount: 40.00, balance: 1340.27, dueDate: '2025-11-15', active: true, paid: false },
-                { name: 'Chase Freedom', amount: 85.00, balance: 4257.00, dueDate: '2025-11-10', active: true, paid: false },
-                { name: 'AliveCor', amount: 11.99, dueDate: '2025-11-12', active: true, paid: false },
-                { name: 'Writers Welcome', amount: 149.00, dueDate: '2025-11-01', active: true, paid: false },
-                { name: 'Amazon Prime', amount: 15.89, dueDate: '2025-11-05', active: true, paid: false },
-                { name: 'Prime Video', amount: 12.99, dueDate: '2025-11-08', active: true, paid: false },
-                { name: 'OpenAI', amount: 20.00, dueDate: '2025-11-12', active: true, paid: false },
-                { name: 'Claude.AI', amount: 20.00, dueDate: '2025-11-14', active: true, paid: false },
-                { name: 'NY Times Digital', amount: 4.00, dueDate: '2025-11-18', active: true, paid: false },
-                { name: 'Google Pandora', amount: 10.99, dueDate: '2025-11-15', active: true, paid: false },
-                { name: 'Microsoft 365', amount: 10.59, dueDate: '2025-11-10', active: true, paid: false },
-                { name: 'BeenVerified', amount: 29.99, dueDate: '2025-11-20', active: true, paid: false },
-                { name: 'Google YouTube Premium', amount: 13.99, dueDate: '2025-11-10', active: true, paid: false },
-                { name: 'Truck Loan - PAID OFF', amount: 1500.00, dueDate: '2025-09-04', active: false, paid: false }
+                { name: 'Community West CU - Mortgage', amount: 800.00, dueDate: '2025-11-04', active: true, paid: false, notes: '' },
+                { name: 'Travelers Insurance', amount: 140.08, dueDate: '2025-11-07', active: true, paid: false, notes: '' },
+                { name: 'Auto-Owners Insurance', amount: 102.81, dueDate: '2025-11-06', active: true, paid: false, notes: '' },
+                { name: 'Consumers Energy', amount: 90.00, dueDate: '2025-11-04', active: true, paid: false, notes: '' },
+                { name: 'DTE Energy', amount: 20.00, dueDate: '2025-11-20', active: true, paid: false, notes: '' },
+                { name: 'Verizon Wireless', amount: 85.00, dueDate: '2025-11-10', active: true, paid: false, notes: '' },
+                { name: 'Comcast', amount: 43.00, dueDate: '2025-11-15', active: true, paid: false, notes: '' },
+                { name: 'Barclaycard US', amount: 50.00, dueDate: '2025-11-01', active: true, paid: false, notes: '' },
+                { name: 'Amex Payment', amount: 40.00, balance: 1340.27, dueDate: '2025-11-15', active: true, paid: false, notes: '' },
+                { name: 'Chase Freedom', amount: 85.00, balance: 4257.00, dueDate: '2025-11-10', active: true, paid: false, notes: '' },
+                { name: 'AliveCor', amount: 11.99, dueDate: '2025-11-12', active: true, paid: false, notes: '' },
+                { name: 'Writers Welcome', amount: 149.00, dueDate: '2025-11-01', active: true, paid: false, notes: '' },
+                { name: 'Amazon Prime', amount: 15.89, dueDate: '2025-11-05', active: true, paid: false, notes: '' },
+                { name: 'Prime Video', amount: 12.99, dueDate: '2025-11-08', active: true, paid: false, notes: '' },
+                { name: 'OpenAI', amount: 20.00, dueDate: '2025-11-12', active: true, paid: false, notes: '' },
+                { name: 'Claude.AI', amount: 20.00, dueDate: '2025-11-14', active: true, paid: false, notes: '' },
+                { name: 'NY Times Digital', amount: 4.00, dueDate: '2025-11-18', active: true, paid: false, notes: '' },
+                { name: 'Google Pandora', amount: 10.99, dueDate: '2025-11-15', active: true, paid: false, notes: '' },
+                { name: 'Microsoft 365', amount: 10.59, dueDate: '2025-11-10', active: true, paid: false, notes: '' },
+                { name: 'BeenVerified', amount: 29.99, dueDate: '2025-11-20', active: true, paid: false, notes: '' },
+                { name: 'Google YouTube Premium', amount: 13.99, dueDate: '2025-11-10', active: true, paid: false, notes: '' },
+                { name: 'Truck Loan - PAID OFF', amount: 1500.00, dueDate: '2025-09-04', active: false, paid: false, notes: '' }
             ];
 
             defaultBills.forEach((bill, index) => {
