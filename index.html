@@ -75,35 +75,6 @@
             color: #1e3c72;
         }
         
-        .notes-section {
-            padding: 20px;
-            background: #fff3cd;
-            border-bottom: 2px solid #ffc107;
-        }
-        
-        .notes-section h3 {
-            font-size: 1em;
-            color: #856404;
-            margin-bottom: 10px;
-        }
-        
-        .notes-input {
-            width: 100%;
-            padding: 10px;
-            border: 2px solid #ffc107;
-            border-radius: 6px;
-            font-size: 1em;
-            resize: vertical;
-            min-height: 60px;
-        }
-        
-        .notes-counter {
-            font-size: 0.85em;
-            color: #856404;
-            margin-top: 5px;
-            text-align: right;
-        }
-        
         .controls {
             padding: 20px;
             background: white;
@@ -167,7 +138,8 @@
         }
         
         .form-group input,
-        .form-group select {
+        .form-group select,
+        .form-group textarea {
             padding: 8px;
             border: 1px solid #ccc;
             border-radius: 4px;
@@ -175,7 +147,8 @@
         }
         
         .form-group input:focus,
-        .form-group select:focus {
+        .form-group select:focus,
+        .form-group textarea:focus {
             outline: none;
             border-color: #1e3c72;
         }
@@ -236,6 +209,21 @@
         
         .bill-detail-row {
             margin: 4px 0;
+        }
+        
+        .bill-notes {
+            background: #fff3cd;
+            border: 1px solid #ffc107;
+            border-radius: 4px;
+            padding: 8px;
+            margin: 10px 0;
+            font-size: 0.85em;
+            color: #856404;
+        }
+        
+        .bill-notes.empty {
+            font-style: italic;
+            color: #999;
         }
         
         .progress-bar {
@@ -373,6 +361,13 @@
             color: #000;
         }
         
+        .word-counter {
+            font-size: 0.75em;
+            color: #999;
+            text-align: right;
+            margin-top: 2px;
+        }
+        
         @media (max-width: 600px) {
             .header h1 {
                 font-size: 1.5em;
@@ -418,12 +413,6 @@
                 <h3>Annual Fees</h3>
                 <div class="amount" id="annualFees">$0.00</div>
             </div>
-        </div>
-        
-        <div class="notes-section">
-            <h3>📝 Quick Notes (Max 10 words)</h3>
-            <textarea class="notes-input" id="notesInput" placeholder="Add quick notes here..."></textarea>
-            <div class="notes-counter" id="notesCounter">0 / 10 words</div>
         </div>
         
         <div class="controls">
@@ -494,6 +483,11 @@
                     <label>Monthly Fee</label>
                     <input type="number" id="editMonthlyFee" step="0.01" placeholder="Optional">
                 </div>
+                <div class="form-group" style="grid-column: 1 / -1;">
+                    <label>Notes (Max 10 words)</label>
+                    <textarea id="editNotes" rows="3" placeholder="Quick notes about this bill..."></textarea>
+                    <div class="word-counter" id="editNotesCounter">0 / 10 words</div>
+                </div>
             </div>
             <div style="margin-top: 20px; display: flex; gap: 10px;">
                 <button class="btn btn-success" onclick="saveEdit()">Save Changes</button>
@@ -519,39 +513,9 @@
         const app = initializeApp(firebaseConfig);
         const database = getDatabase(app);
         const billsRef = ref(database, 'billsDetailed');
-        const notesRef = ref(database, 'notes');
 
         let bills = [];
         let editingBillId = null;
-
-        // Load notes
-        onValue(notesRef, (snapshot) => {
-            const notes = snapshot.val();
-            if (notes) {
-                document.getElementById('notesInput').value = notes;
-                updateNotesCounter();
-            }
-        });
-
-        // Notes word counter
-        document.getElementById('notesInput').addEventListener('input', function() {
-            updateNotesCounter();
-            const words = this.value.trim().split(/\s+/).filter(w => w.length > 0);
-            if (words.length > 10) {
-                const limited = words.slice(0, 10).join(' ');
-                this.value = limited;
-                updateNotesCounter();
-            }
-            // Auto-save notes
-            set(notesRef, this.value);
-        });
-
-        function updateNotesCounter() {
-            const text = document.getElementById('notesInput').value.trim();
-            const words = text.split(/\s+/).filter(w => w.length > 0);
-            const count = text.length === 0 ? 0 : words.length;
-            document.getElementById('notesCounter').textContent = `${count} / 10 words`;
-        }
 
         onValue(billsRef, (snapshot) => {
             const data = snapshot.val();
@@ -625,7 +589,8 @@
                 amount,
                 dueDate,
                 active: true,
-                paid: false
+                paid: false,
+                notes: ''
             };
 
             updateSyncStatus(false);
@@ -636,6 +601,13 @@
                 toggleForm();
             });
         };
+
+        function updateNotesCounter() {
+            const text = document.getElementById('editNotes').value.trim();
+            const words = text.split(/\s+/).filter(w => w.length > 0);
+            const count = text.length === 0 ? 0 : words.length;
+            document.getElementById('editNotesCounter').textContent = `${count} / 10 words`;
+        }
 
         window.openEditModal = function(billId) {
             const bill = bills.find(b => b.id === billId);
@@ -650,6 +622,19 @@
             document.getElementById('editRateExpiry').value = bill.interestRateExpiry || '';
             document.getElementById('editAnnualFee').value = bill.annualFee || '';
             document.getElementById('editMonthlyFee').value = bill.monthlyFee || '';
+            document.getElementById('editNotes').value = bill.notes || '';
+            
+            updateNotesCounter();
+            
+            document.getElementById('editNotes').addEventListener('input', function() {
+                updateNotesCounter();
+                const words = this.value.trim().split(/\s+/).filter(w => w.length > 0);
+                if (words.length > 10) {
+                    const limited = words.slice(0, 10).join(' ');
+                    this.value = limited;
+                    updateNotesCounter();
+                }
+            });
 
             document.getElementById('editModal').classList.add('show');
         };
@@ -670,7 +655,8 @@
                 interestRate: parseFloat(document.getElementById('editRate').value) || null,
                 interestRateExpiry: document.getElementById('editRateExpiry').value || null,
                 annualFee: parseFloat(document.getElementById('editAnnualFee').value) || null,
-                monthlyFee: parseFloat(document.getElementById('editMonthlyFee').value) || null
+                monthlyFee: parseFloat(document.getElementById('editMonthlyFee').value) || null,
+                notes: document.getElementById('editNotes').value.trim()
             };
 
             // Keep existing fields
@@ -745,9 +731,7 @@
                 // Assume 30-day billing cycle
                 const cycleLength = 30;
                 const daysElapsed = cycleLength - daysRemaining;
-                const elapsedPercent = Math.max(0, (daysElapsed / cycleLength) * 100);
-                const remainingPercent = Math.max(0, (daysRemaining / cycleLength) * 100);
-
+                
                 let statusText = '';
                 let progressBarHtml = '';
 
@@ -758,39 +742,53 @@
                             <div class="progress-full-green">✅ PAID - Bill Cycle Complete</div>
                         </div>
                     `;
+                } else if (daysRemaining < 0) {
+                    // Overdue - show all gray
+                    statusText = `⚠️ OVERDUE by ${Math.abs(daysRemaining)} days`;
+                    progressBarHtml = `
+                        <div class="progress-bar">
+                            <div class="progress-elapsed" style="width: 100%">
+                                OVERDUE by ${Math.abs(daysRemaining)} days
+                            </div>
+                        </div>
+                    `;
                 } else {
-                    const remainingColor = daysRemaining <= 3 ? 'red' : 'green';
+                    // Normal - show gray (elapsed), green (safe remaining), red (last 3 days)
+                    const elapsedPercent = Math.max(0, (daysElapsed / cycleLength) * 100);
                     
-                    if (daysRemaining < 0) {
-                        statusText = `⚠️ OVERDUE by ${Math.abs(daysRemaining)} days`;
-                    } else if (daysRemaining <= 3) {
+                    let greenDays, redDays, greenPercent, redPercent;
+                    
+                    if (daysRemaining <= 3) {
+                        // In the danger zone - all remaining time is red
+                        greenDays = 0;
+                        redDays = daysRemaining;
+                        greenPercent = 0;
+                        redPercent = (redDays / cycleLength) * 100;
                         statusText = `🔴 DUE IN ${daysRemaining} DAYS`;
                     } else {
+                        // Safe zone - split into green and red
+                        greenDays = daysRemaining - 3;
+                        redDays = 3;
+                        greenPercent = (greenDays / cycleLength) * 100;
+                        redPercent = (redDays / cycleLength) * 100;
                         statusText = `${daysRemaining} days remaining`;
                     }
 
-                    if (daysRemaining < 0) {
-                        // Overdue - show all gray
-                        progressBarHtml = `
-                            <div class="progress-bar">
-                                <div class="progress-elapsed" style="width: 100%">
-                                    OVERDUE by ${Math.abs(daysRemaining)} days
-                                </div>
+                    progressBarHtml = `
+                        <div class="progress-bar">
+                            <div class="progress-elapsed" style="width: ${elapsedPercent}%">
+                                ${daysElapsed > 0 ? daysElapsed + 'd' : ''}
                             </div>
-                        `;
-                    } else {
-                        // Normal - show gray (elapsed) and green/red (remaining)
-                        progressBarHtml = `
-                            <div class="progress-bar">
-                                <div class="progress-elapsed" style="width: ${elapsedPercent}%">
-                                    ${daysElapsed > 0 ? daysElapsed + 'd elapsed' : ''}
+                            ${greenPercent > 0 ? `
+                                <div class="progress-remaining progress-green" style="width: ${greenPercent}%">
+                                    ${greenDays}d
                                 </div>
-                                <div class="progress-remaining progress-${remainingColor}" style="width: ${remainingPercent}%">
-                                    ${daysRemaining} days left
-                                </div>
+                            ` : ''}
+                            <div class="progress-remaining progress-red" style="width: ${redPercent}%">
+                                ${redDays}d
                             </div>
-                        `;
-                    }
+                        </div>
+                    `;
                 }
 
                 let details = `<div class="bill-detail-row">Due: ${dueDate.toLocaleDateString()} - ${statusText}</div>`;
@@ -812,6 +810,14 @@
                     details += `<div class="bill-detail-row">Monthly Fee: $${bill.monthlyFee.toFixed(2)}</div>`;
                 }
 
+                // Add notes section
+                let notesHtml = '';
+                if (bill.notes && bill.notes.trim()) {
+                    notesHtml = `<div class="bill-notes">📝 ${bill.notes}</div>`;
+                } else {
+                    notesHtml = `<div class="bill-notes empty">No notes</div>`;
+                }
+
                 const itemClasses = ['bill-item'];
                 if (!bill.active) itemClasses.push('inactive');
                 if (isPaid) itemClasses.push('paid');
@@ -823,6 +829,7 @@
                             <div class="bill-amount">$${bill.amount.toFixed(2)}</div>
                         </div>
                         <div class="bill-details">${details}</div>
+                        ${notesHtml}
                         ${progressBarHtml}
                         <div class="bill-actions">
                             <button class="btn-small btn-edit" onclick="openEditModal('${bill.id}')">Edit Details</button>
